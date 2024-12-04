@@ -1,22 +1,34 @@
 #!/bin/sh
+# This script can be used to bypass github actions
+# it deploys to pipy with api credentials
+# (username=__token__, password=pypi-***)
 
 set -e
+# extract the version="x.y.z" from setup.py
+VER=$(sed -n -e 's/.*version="\(.*\)".*/\1/p' < setup.py)
 
-DOCKER_REPO=stv0g
-DOCKER_IMAGE=${DOCKER_REPO}/withings-sync
+function tag_if_not_tagged {
+  TAG=v$1
+  if git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
+    echo "tag ${TAG} already exists"
+  else
+    git tag $TAG
+    git push --tags
+    echo "tagged ${TAG}"
+  fi
+}
 
-VER=$(sed -n -e 's/.*version='\''\([0-9\.]*\)'\''.*/\1/p' < setup.py)
+function publish_to_pypi() {
+  VERSION=$1
+  echo "creating sdist.."
+  python3 setup.py sdist > /dev/null
+  ARTIFACT="dist/withings-sync-${VERSION}.tar.gz"
+  # Publish to pypi.org
+  twine check $ARTIFACT
+  twine upload $ARTIFACT
+}
 
-git tag v${VER} || true
-git push --tags
+tag_if_not_tagged $VER
+publish_to_pypi $VER
 
-docker build \
-    -t ${DOCKER_IMAGE} \
-    -t ${DOCKER_IMAGE}:${VER} .
 
-docker push ${DOCKER_IMAGE}
-docker push ${DOCKER_IMAGE}:${VER}
-
-python3 setup.py sdist
-
-twine upload dist/withings-sync-${VER}.tar.gz

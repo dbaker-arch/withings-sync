@@ -1,23 +1,10 @@
 # withings-sync
 
-A tool for synchronisation of Withings (ex. Nokia Health Body) to:
+A tool for synchronisation of the Withings API to:
 
 - Garmin Connect
 - Trainer Road
-
-**NOTE: For Docker usage hits see at end of this document:** https://hub.docker.com/r/stv0g/withings-sync
-
-**NOTE: Included support for Withings OAuth2! See 'Obtaining Withings authorization'**
-
-## References
-
-* SSO authorization derived from https://github.com/cpfair/tapiriik
-* TrainerRoad API from https://github.com/stuwilkins/python-trainerroad 
-
-## Credits / Authors
-
-* Based on [withings-garmin](https://github.com/ikasamah/withings-garmin) by Masayuki Hamasaki, improved to support SSO authorization in Garmin Connect 2.
-* Based on [withings-garmin-v2](https://github.com/jaroslawhartman/withings-garmin-v2) by Jarek Hartman, improved Python 3 compatability, code-style and setuptools packaging, Kubernetes and Docker support.
+- raw JSON output
 
 ## Installation
 
@@ -28,35 +15,63 @@ $ pip install withings-sync
 ## Usage
 
 ```
-usage: withings-sync [-h] [--garmin-username GARMIN_USERNAME] [--garmin-password GARMIN_PASSWORD] [--trainerroad-username TRAINERROAD_USERNAME] [--trainerroad-password TRAINERROAD_PASSWORD]
-                     [--fromdate DATE] [--todate DATE] [--no-upload] [--verbose]
+usage: withings-sync [-h] [--garmin-username GARMIN_USERNAME] [--garmin-password GARMIN_PASSWORD] [--trainerroad-username TRAINERROAD_USERNAME] [--trainerroad-password TRAINERROAD_PASSWORD] [--fromdate DATE]
+                     [--todate DATE] [--to-fit] [--to-json] [--output BASENAME] [--no-upload] [--verbose]
 
-A tool for synchronisation of Withings (ex. Nokia Health Body) to Garmin Connect and Trainer Road.
+A tool for synchronisation of Withings (ex. Nokia Health Body) to Garmin Connect and Trainer Road or to provide a json string.
 
 optional arguments:
   -h, --help            show this help message and exit
   --garmin-username GARMIN_USERNAME, --gu GARMIN_USERNAME
-                        username to login Garmin Connect.
+                        username to log in to Garmin Connect.
   --garmin-password GARMIN_PASSWORD, --gp GARMIN_PASSWORD
-                        password to login Garmin Connect.
+                        password to log in to Garmin Connect.
   --trainerroad-username TRAINERROAD_USERNAME, --tu TRAINERROAD_USERNAME
-                        username to login TrainerRoad.
+                        username to log in to TrainerRoad.
   --trainerroad-password TRAINERROAD_PASSWORD, --tp TRAINERROAD_PASSWORD
-                        username to login TrainerRoad.
+                        password to log in to TrainerRoad.
   --fromdate DATE, -f DATE
   --todate DATE, -t DATE
-  --no-upload           Won't upload to Garmin Connect and output binary-strings to stdout.
+  --to-fit, -F          Write output file in FIT format.
+  --to-json, -J         Write output file in JSON format.
+  --output BASENAME, -o BASENAME
+                        Write downloaded measurements to file.
+  --features            Enable Features
+                        BLOOD_PRESSURE = sync blood pressure
+  --no-upload           Won't upload to Garmin Connect or TrainerRoad.
   --verbose, -v         Run verbosely
 ```
 
-### Providing crendtials via environment variables
+### Providing credentials via environment variables
 
 You can use the following environment variables for providing the Garmin and/or Trainerroad credentials:
 
 - `GARMIN_USERNAME`
-- `GARMIN_PASSWORD` 
+- `GARMIN_PASSWORD`
 - `TRAINERROAD_USERNAME`
 - `TRAINERROAD_PASSWORD`
+
+The CLI also uses python-dotenv to populate the variables above. Therefore setting the environment variables
+has the same effect as placing the variables in a `.env` file in the working directory.
+
+### Providing credentials via secrets files
+
+You can also populate the following 'secrets' files to provide the Garmin and/or Trainerroad credentials:
+
+- `/run/secrets/garmin_username`
+- `/run/secrets/garmin_password`
+- `/run/secrets/trainerroad_username`
+- `/run/secrets/trainerroad_password`
+
+Secrets are useful in an orchestrated container context — see the [Docker Swarm](https://docs.docker.com/engine/swarm/secrets/) or [Rancher](https://rancher.com/docs/rancher/v1.6/en/cattle/secrets/) docs for more information on how to securely inject secrets into a container.
+
+### Order of priority for credentials
+
+In the case of credentials being available via multiple means (e.g. [environment variables](#providing-credentials-via-environment-variables) and [secrets files](#providing-credentials-via-secrets-files)), the order of resolution for determining which credentials to use is as follows, with later methods overriding credentials supplied by an earlier method:
+
+1. Read secrets file(s)
+2. Read environment variable(s), variables set explicitly take precedence over values from a `.env` file.
+3. Use command invocation argument(s)
 
 ### Obtaining Withings Authorization Code
 
@@ -82,10 +97,31 @@ This is one-time activity and it will not be needed to repeat.
 
 ## Tips
 
+### Garmin SSO errors
+
+Some users reported errors raised by the Garmin SSO login:
+
+```
+withings_sync.garmin.APIException: SSO error 401
+```
+
+or 
+
+```
+withings_sync.garmin.APIException: SSO error 403
+```
+
+These errors are raised if a user tries to login too frequently.
+E.g. by running the script every 10 minutes.
+
+**We recommend to run the script around 8-10 times per day (every 2-3 hours).**
+
+See also: https://github.com/jaroslawhartman/withings-sync/issues/31
+
 ### Docker
 
 ```
-$ docker pull stv0g/withings-sync
+$ docker pull ghcr.io/jaroslawhartman/withings-sync:master
 ```
 
 First start to ensure the script can start successfully:
@@ -94,7 +130,7 @@ First start to ensure the script can start successfully:
 Obtaining Withings authorisation:
 
 ```
-$ docker run -v $HOME:/root --interactive --tty --name withings stv0g/withings-sync --garmin-username=<username> --garmin-password=<password>
+$ docker run -v $HOME:/root --interactive --tty --name withings ghcr.io/jaroslawhartman/withings-sync:master --garmin-username=<username> --garmin-password=<password>
 
 Can't read config file config/withings_user.json
 User interaction needed to get Authentification Code from Withings!
@@ -125,6 +161,9 @@ JaHa.WAW.PL
 Garmin Connect User Name: JaHa.WAW.PL
 Fit file uploaded to Garmin Connect
 ```
+### Garmin auth
+
+You can configure the location of the garmin session file with the variabe `GARMIN_SESSION`.
 
 ### Run a periodic Kubernetes job
 
@@ -140,7 +179,7 @@ The script has been registered as a Withings application and got assigned `Clien
 
 
 * First you need a Withings account. [Sign up here](https://account.withings.com/connectionuser/account_create).
-* Then you need a a Withings developer app registered. [Create your app here](https://account.withings.com/partner/add_oauth2).
+* Then you need a Withings developer app registered. [Create your app here](https://account.withings.com/partner/add_oauth2).
 
 Note, registering it is quite cumbersome, as you need to have a callback URL and an Icon. Anyway, when done, you should have the following identifiers:
 
@@ -161,3 +200,78 @@ Configure them in `config/withings_app.json`, for example:
 ```
 
 For the callback URL you will need to setup a webserver hosting `contrib/withings.html`.
+
+To do this in a Docker installation, you can use the environment variable `WITHINGS_APP` to point to a mounted `withings_app.json`
+
+Example docker-compose:
+```
+  withings-sync:
+    container_name: withings-sync
+    image: ghcr.io/jaroslawhartman/withings-sync:latest
+    volumes:
+      - "withings-sync:/root"
+      - "/etc/localtime:/etc/localtime:ro"
+    environment:
+      WITHINGS_APP: /root/withings_app.json
+(...)
+```
+You can then add the app-config in `withings-sync/withings_app.json`
+
+
+### Run a periodic docker-compose cronjob
+
+We take the official docker image and override the entrypoint to crond.
+
+If you have completed the initial setup (withings_user.json created and working), you can create the following config
+
+```
+version: "3.8"
+services:
+  withings-sync:
+    container_name: withings-sync
+    image: ghcr.io/jaroslawhartman/withings-sync:master
+    volumes:
+      - "${VOLUME_PATH}/withings-sync:/root" 
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - TZ=${TIME_ZONE}
+    entrypoint: "/root/entrypoint.sh"
+```
+
+The `entrypoint.sh` will then register the cronjob. For example:
+
+```
+#!/bin/sh
+echo "$(( $RANDOM % 59 +0 )) */3 * * * withings-sync --gu garmin-username --gp 'mypassword' -v | tee -a /root/withings-sync.log" > /etc/crontabs/root
+crond -f -l 6 -L /dev/stdout
+```
+
+This will run the job every 3 hours (at a random minute) and writing the output to console and the `/root/withings-sync.log`.
+
+## Release
+
+Release works via the GitHub [Draft a new Release](https://github.com/jaroslawhartman/withings-sync/releases/new) 
+function.
+The `version` key in `setup.py` will be bumped automatically (Version will be written to setup.py file).
+
+### Docker Image
+
+An image is created magically by GitHub Action and published 
+to [ghcr](https://github.com/jaroslawhartman/withings-sync/pkgs/container/withings-sync).
+
+### Manual release: pypi
+
+Will be conducted automatically within the Github-Release cycle.
+You'll find a script to create and upload a release to pypi here `contrib/do_release.sh`.
+It requires [twine](https://pypi.org/project/twine/).
+This needs the permission on the [pypi-project](https://pypi.org/project/withings-sync/).
+
+## References
+
+* SSO authorization derived from https://github.com/cpfair/tapiriik
+* TrainerRoad API from https://github.com/stuwilkins/python-trainerroad
+
+## Credits / Authors
+
+* Based on [withings-garmin](https://github.com/ikasamah/withings-garmin) by Masayuki Hamasaki, improved to support SSO authorization in Garmin Connect 2.
+* Based on [withings-garmin-v2](https://github.com/jaroslawhartman/withings-garmin-v2) by Jarek Hartman, improved Python 3 compatability, code-style and setuptools packaging, Kubernetes and Docker support. 

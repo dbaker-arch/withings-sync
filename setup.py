@@ -1,6 +1,7 @@
 import os
 from setuptools import setup
 
+
 # Utility function to read the README file.
 # Used for the long_description.  It's nice, because now 1) we have a top level
 # README file and 2) it's easier to type in the README file than to put a raw
@@ -8,30 +9,31 @@ from setuptools import setup
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
+
 setup(
-    name='withings-sync',
-    version='3.1.2',
-    author='Masayuki Hamasaki',
-    description='A tool for synchronisation of Withings (ex. Nokia Health Body) to Garmin Connect and Trainer Road.',
-    license='MIT',
-    keywords='garmin withings sync api scale smarthome',
-    url='http://packages.python.org/an_example_pypi_project',
-    packages=['withings_sync'],
-    long_description=read('README.md'),
-    long_description_content_type='text/markdown',
+    name="withings-sync",
+    version="1.0.0.dev1",
+    author="Masayuki Hamasaki, Steffen Vogel",
+    author_email="post@steffenvogel.de",
+    description="A tool for synchronisation of Withings (ex. Nokia Health Body) to Garmin Connect and Trainer Road.",
+    license="MIT",
+    keywords="garmin withings sync api scale smarthome",
+    url="https://github.com/jaroslawhartman/withings-sync",
+    packages=["withings_sync"],
+    long_description=read("README.md"),
+    long_description_content_type="text/markdown",
     classifiers=[
-        'Topic :: Utilities',
-        'License :: OSI Approved :: MIT License',
+        "Topic :: Utilities",
+        "License :: OSI Approved :: MIT License",
     ],
     install_requires=[
-        'lxml',
-        'requests'
-    ],
+        "lxml==5.2.2",
+        "requests==2.31.0",
+        "garth==0.4.46",
+        "python-dotenv"],
     entry_points={
-        'console_scripts': [
-            'withings-sync=withings_sync.sync:main'
-        ],
+        "console_scripts": ["withings-sync=withings_sync.sync:main"],
     },
     zip_safe=False,
-    include_package_data=True
+    include_package_data=True,
 )

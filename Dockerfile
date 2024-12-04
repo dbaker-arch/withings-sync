@@ -1,14 +1,17 @@
-FROM python:3.8-alpine
+FROM python:3.12-alpine
 
-RUN apk add --update --no-cache libxml2-dev libxslt-dev gcc musl-dev
-
-# Profit from Docker build cache buy building python lxml here..
-RUN pip3 install lxml requests
+# Install python-lxml
+RUN apk add --no-cache --virtual .build-deps \
+    gcc musl-dev \
+    libxslt-dev libxml2-dev && \
+    pip install lxml setuptools && \
+    apk del .build-deps && \
+    apk add --no-cache libxslt libxml2
 
 RUN mkdir -p /src
 COPY . /src
 
 RUN cd /src && \
-    python3 ./setup.py install
+    pip install .
 
 ENTRYPOINT ["withings-sync"]
